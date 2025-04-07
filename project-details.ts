@@ -1,5 +1,5 @@
 import { Frame } from "lucide-react";
-import { Project } from "../index";
+import { Project } from "../types";
 
 export const projectDetails: Project = {
   title: "Boids",
