@@ -1448,7 +1448,7 @@ const BoidsSimulation = () => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isPaused]); // Only re-run when pause state changes
+  }, [isPaused, updateFrame]); // Add updateFrame to dependencies
 
   // Separate effect for initialization and resize handling
   useEffect(() => {
