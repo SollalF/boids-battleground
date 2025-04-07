@@ -1,4 +1,5 @@
-import { Project } from "../page";
+import { Frame } from "lucide-react";
+import { Project } from "../index";
 
 export const projectDetails: Project = {
   title: "Boids",
@@ -10,4 +11,6 @@ export const projectDetails: Project = {
   imageUrl: "/projects/boids-battleground.png", // Add your image to the public/projects folder
   tags: ["TypeScript", "Canvas API", "Algorithm", "Simulation"],
   githubUrl: "https://github.com/SollalF/boids-battleground",
+  liveUrl: "/projects/boids-battleground", // Link to the local page for this project
+  icon: Frame,
 };
