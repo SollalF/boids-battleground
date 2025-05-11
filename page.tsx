@@ -3,6 +3,10 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import BoidsSimulation from "./boids";
 import { projectDetails } from "./project-details";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import fs from "fs";
+import path from "path";
 
 export const metadata: Metadata = {
   title: projectDetails.title,
@@ -10,6 +14,15 @@ export const metadata: Metadata = {
 };
 
 export default function BoidsBattleground() {
+  const readmeFilePath = path.join(
+    process.cwd(),
+    "app",
+    "projects",
+    "boids-battleground",
+    "README.md",
+  );
+  const readmeContent = fs.readFileSync(readmeFilePath, "utf-8");
+
   return (
     <main className="container mx-auto px-4 py-8 max-w-4xl relative">
       <div className="flex flex-col items-center space-y-8 relative">
@@ -74,6 +87,13 @@ export default function BoidsBattleground() {
       {/* Boids Simulation Container */}
       <div className="w-full h-[600px] mt-12 border border-gray-200 rounded-lg overflow-hidden">
         <BoidsSimulation />
+      </div>
+
+      {/* README Content Section */}
+      <div className="prose dark:prose-invert max-w-none w-full py-8">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {readmeContent}
+        </ReactMarkdown>
       </div>
     </main>
   );
