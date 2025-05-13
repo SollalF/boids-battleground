@@ -1,16 +1,15 @@
-import { Frame } from "lucide-react";
-import { Project } from "../types";
+import { CirclePlay } from "lucide-react";
 
-export const projectDetails: Project = {
-  title: "Boids",
-  description: "A simulation of flocking behavior",
-  longDescription: `
-    Boids Battleground is an interactive simulation that demonstrates emergent behavior
-    through the implementation of Craig Reynolds' Boids algorithm.
-  `,
-  imageUrl: "/projects/boids-battleground.png", // Add your image to the public/projects folder
-  tags: ["TypeScript", "Canvas API", "Algorithm", "Simulation"],
+export const projectDetails = {
+  title: "Boids Battleground",
+  projectSlug: "boids-battleground",
+  description:
+    "An interactive simulation of flocking behavior based on Craig Reynolds' Boids algorithm.",
+  longDescription:
+    "This simulation demonstrates emergent collective behavior from simple rules followed by autonomous agents. Users can adjust parameters to see how different settings affect the flocking behavior.",
+  imageUrl: "/projects/boids-battleground.png",
+  tags: ["Canvas", "Simulation", "Interactive", "Next.js", "TypeScript"],
   githubUrl: "https://github.com/SollalF/boids-battleground",
-  liveUrl: "/projects/boids-battleground", // Link to the local page for this project
-  icon: Frame,
+  liveUrl: "https://boids.demo.com",
+  icon: CirclePlay,
 };
