@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -1042,31 +1042,43 @@ const BoidsSimulation = () => {
   }, []);
 
   // Define boid behavior functions outside useEffect to avoid recreating them
-  const keepWithinBounds = (boid: Boid, width: number, height: number) => {
-    const settings = settingsRef.current;
+  const keepWithinBounds = useCallback(
+    (boid: Boid, width: number, height: number) => {
+      const settings = settingsRef.current;
 
-    if (settings.wraparoundMode) {
-      // Wraparound mode - boids leaving one edge appear on the opposite edge
-      if (boid.x < 0) boid.x = width;
-      if (boid.x > width) boid.x = 0;
-      if (boid.y < 0) boid.y = height;
-      if (boid.y > height) boid.y = 0;
-    } else {
-      // Original bounded mode - boids turn away from edges
-      const marginX = width * settings.marginFraction;
-      const marginY = height * settings.marginFraction;
+      if (settings.wraparoundMode) {
+        // Wraparound mode - boids leaving one edge appear on the opposite edge
+        if (boid.x < 0) boid.x = width;
+        if (boid.x > width) boid.x = 0;
+        if (boid.y < 0) boid.y = height;
+        if (boid.y > height) boid.y = 0;
+      } else {
+        // Original bounded mode - boids turn away from edges
+        const marginX = width * settings.marginFraction;
+        const marginY = height * settings.marginFraction;
 
-      // Scale the turn factor based on the scale parameter
-      const scaledTurnFactor = settings.turnFactor / settings.scale;
+        // Scale the turn factor based on the scale parameter
+        const scaledTurnFactor = settings.turnFactor / settings.scale;
 
-      if (boid.x < marginX) boid.dx += scaledTurnFactor;
-      if (boid.x > width - marginX) boid.dx -= scaledTurnFactor;
-      if (boid.y < marginY) boid.dy += scaledTurnFactor;
-      if (boid.y > height - marginY) boid.dy -= scaledTurnFactor;
-    }
-  };
+        if (boid.x < marginX) boid.dx += scaledTurnFactor;
+        if (boid.x > width - marginX) boid.dx -= scaledTurnFactor;
+        if (boid.y < marginY) boid.dy += scaledTurnFactor;
+        if (boid.y > height - marginY) boid.dy -= scaledTurnFactor;
+      }
+    },
+    [],
+  );
 
-  const applyCohesion = (boid: Boid, boids: Boid[]) => {
+  // MUST be defined before other useCallbacks that depend on it
+  const hexToRgba = useCallback((hex: string, alpha: number): string => {
+    hex = hex.replace("#", "");
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }, []);
+
+  const applyCohesion = useCallback((boid: Boid, boids: Boid[]) => {
     const settings = settingsRef.current;
     let centerX = 0;
     let centerY = 0;
@@ -1089,9 +1101,9 @@ const BoidsSimulation = () => {
       boid.dx += (centerX - boid.x) * settings.centeringFactor;
       boid.dy += (centerY - boid.y) * settings.centeringFactor;
     }
-  };
+  }, []);
 
-  const applySeparation = (boid: Boid, boids: Boid[]) => {
+  const applySeparation = useCallback((boid: Boid, boids: Boid[]) => {
     const settings = settingsRef.current;
     let moveX = 0;
     let moveY = 0;
@@ -1110,9 +1122,9 @@ const BoidsSimulation = () => {
 
     boid.dx += moveX * settings.avoidFactor;
     boid.dy += moveY * settings.avoidFactor;
-  };
+  }, []);
 
-  const applyAlignment = (boid: Boid, boids: Boid[]) => {
+  const applyAlignment = useCallback((boid: Boid, boids: Boid[]) => {
     const settings = settingsRef.current;
     let avgDX = 0;
     let avgDY = 0;
@@ -1135,9 +1147,9 @@ const BoidsSimulation = () => {
       boid.dx += (avgDX - boid.dx) * settings.matchingFactor;
       boid.dy += (avgDY - boid.dy) * settings.matchingFactor;
     }
-  };
+  }, []);
 
-  const limitSpeed = (boid: Boid) => {
+  const limitSpeed = useCallback((boid: Boid) => {
     const settings = settingsRef.current;
     const speed = Math.sqrt(boid.dx * boid.dx + boid.dy * boid.dy);
 
@@ -1164,7 +1176,7 @@ const BoidsSimulation = () => {
         boid.dy = (boid.dy / speed) * scaledMinSpeedLimit;
       }
     }
-  };
+  }, []);
 
   // Helper function to draw a single boid shape
   const drawBoidShape = (
@@ -1190,207 +1202,188 @@ const BoidsSimulation = () => {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   };
 
-  const drawBoid = (ctx: CanvasRenderingContext2D, boid: Boid) => {
-    const settings = settingsRef.current;
+  const drawBoid = useCallback(
+    (
+      ctx: CanvasRenderingContext2D,
+      boid: Boid,
+      hexToRgbaFn: typeof hexToRgba,
+    ) => {
+      const settings = settingsRef.current;
 
-    // Draw the main boid
-    drawBoidShape(ctx, boid, settings.boidColor, settings.scale);
+      // Draw the main boid
+      drawBoidShape(ctx, boid, settings.boidColor, settings.scale);
 
-    // If in wraparound mode and canvas is available, draw ghost boids near edges
-    if (settings.wraparoundMode && canvasRef.current) {
-      const width = canvasRef.current.width;
-      const height = canvasRef.current.height;
-      const edgeThreshold = 30; // Distance from edge to start showing ghost
-      const ghostColor = hexToRgba(settings.boidColor, 0.3); // Semi-transparent
+      // If in wraparound mode and canvas is available, draw ghost boids near edges
+      if (settings.wraparoundMode && canvasRef.current) {
+        const width = canvasRef.current.width;
+        const height = canvasRef.current.height;
+        const edgeThreshold = 30; // Distance from edge to start showing ghost
+        const ghostColor = hexToRgbaFn(settings.boidColor, 0.3); // Use passed hexToRgbaFn
 
-      // Create temporary ghost boids
-      const ghostBoids = [];
+        // Create temporary ghost boids
+        const ghostBoids = [];
 
-      // Check if boid is near horizontal edges
-      if (boid.x < edgeThreshold) {
-        // Create ghost on right side
-        ghostBoids.push({
-          ...boid,
-          x: boid.x + width,
-        });
-      } else if (boid.x > width - edgeThreshold) {
-        // Create ghost on left side
-        ghostBoids.push({
-          ...boid,
-          x: boid.x - width,
-        });
+        // Check if boid is near horizontal edges
+        if (boid.x < edgeThreshold) {
+          // Create ghost on right side
+          ghostBoids.push({
+            ...boid,
+            x: boid.x + width,
+          });
+        } else if (boid.x > width - edgeThreshold) {
+          // Create ghost on left side
+          ghostBoids.push({
+            ...boid,
+            x: boid.x - width,
+          });
+        }
+
+        // Check if boid is near vertical edges
+        if (boid.y < edgeThreshold) {
+          // Create ghost on bottom side
+          ghostBoids.push({
+            ...boid,
+            y: boid.y + height,
+          });
+        } else if (boid.y > height - edgeThreshold) {
+          // Create ghost on top side
+          ghostBoids.push({
+            ...boid,
+            y: boid.y - height,
+          });
+        }
+
+        // Draw all ghost boids
+        for (const ghostBoid of ghostBoids) {
+          drawBoidShape(ctx, ghostBoid, ghostColor, settings.scale);
+        }
       }
 
-      // Check if boid is near vertical edges
-      if (boid.y < edgeThreshold) {
-        // Create ghost on bottom side
-        ghostBoids.push({
-          ...boid,
-          y: boid.y + height,
-        });
-      } else if (boid.y > height - edgeThreshold) {
-        // Create ghost on top side
-        ghostBoids.push({
-          ...boid,
-          y: boid.y - height,
-        });
+      if (settings.drawTrail) {
+        // Use the trail color with 40% opacity
+        ctx.strokeStyle = hexToRgbaFn(settings.trailColor, 0.4);
+        ctx.beginPath();
+        ctx.moveTo(
+          boid.history[0]?.[0] || boid.x,
+          boid.history[0]?.[1] || boid.y,
+        );
+        for (const point of boid.history) {
+          ctx.lineTo(point[0], point[1]);
+        }
+        ctx.stroke();
       }
 
-      // Draw all ghost boids
-      for (const ghostBoid of ghostBoids) {
-        drawBoidShape(ctx, ghostBoid, ghostColor, settings.scale);
+      // Draw visual range indicator when slider is being interacted with
+      if (showVisualRangeRef.current) {
+        // Create a semi-transparent version of the boid color
+        const boidColorRgb = hexToRgbaFn(settings.boidColor, 0.1);
+
+        ctx.beginPath();
+        // Apply scale to the visual range indicator
+        ctx.arc(
+          boid.x,
+          boid.y,
+          settings.visualRange * settings.scale,
+          0,
+          Math.PI * 2,
+        );
+        ctx.strokeStyle = boidColorRgb;
+        ctx.fillStyle = boidColorRgb;
+        ctx.fill();
+        ctx.stroke();
       }
-    }
 
-    if (settings.drawTrail) {
-      // Use the trail color with 40% opacity
-      ctx.strokeStyle = hexToRgba(settings.trailColor, 0.4);
-      ctx.beginPath();
-      ctx.moveTo(
-        boid.history[0]?.[0] || boid.x,
-        boid.history[0]?.[1] || boid.y,
-      );
-      for (const point of boid.history) {
-        ctx.lineTo(point[0], point[1]);
+      // Draw minimum distance indicator when slider is being interacted with
+      if (showMinDistanceRef.current) {
+        // Create a semi-transparent version of the boid color with a different opacity
+        const minDistanceColor = hexToRgbaFn(settings.boidColor, 0.2);
+
+        ctx.beginPath();
+        // Apply scale to the minimum distance indicator
+        ctx.arc(
+          boid.x,
+          boid.y,
+          settings.minDistance * settings.scale,
+          0,
+          Math.PI * 2,
+        );
+        ctx.strokeStyle = minDistanceColor;
+        ctx.fillStyle = minDistanceColor;
+        ctx.fill();
+        ctx.stroke();
       }
-      ctx.stroke();
-    }
-
-    // Draw visual range indicator when slider is being interacted with
-    if (showVisualRangeRef.current) {
-      // Create a semi-transparent version of the boid color
-      const boidColorRgb = hexToRgba(settings.boidColor, 0.1);
-
-      ctx.beginPath();
-      // Apply scale to the visual range indicator
-      ctx.arc(
-        boid.x,
-        boid.y,
-        settings.visualRange * settings.scale,
-        0,
-        Math.PI * 2,
-      );
-      ctx.strokeStyle = boidColorRgb;
-      ctx.fillStyle = boidColorRgb;
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    // Draw minimum distance indicator when slider is being interacted with
-    if (showMinDistanceRef.current) {
-      // Create a semi-transparent version of the boid color with a different opacity
-      const minDistanceColor = hexToRgba(settings.boidColor, 0.2);
-
-      ctx.beginPath();
-      // Apply scale to the minimum distance indicator
-      ctx.arc(
-        boid.x,
-        boid.y,
-        settings.minDistance * settings.scale,
-        0,
-        Math.PI * 2,
-      );
-      ctx.strokeStyle = minDistanceColor;
-      ctx.fillStyle = minDistanceColor;
-      ctx.fill();
-      ctx.stroke();
-    }
-  };
+    },
+    [],
+  );
 
   // Function to draw the margins on the canvas
-  const drawMargins = (
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-  ) => {
-    // Don't draw margins if not showing them or if in wraparound mode
-    if (!showMarginsRef.current || settingsRef.current.wraparoundMode) return;
+  const drawMargins = useCallback(
+    (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+      if (!showMarginsRef.current || settingsRef.current.wraparoundMode) return;
+      const currentSettings = settingsRef.current;
+      const marginColor = hexToRgba(currentSettings.boidColor, 0.1); // Use hexToRgba from outer scope
+      ctx.fillStyle = marginColor;
+      ctx.strokeStyle = hexToRgba(currentSettings.boidColor, 0.3);
+      const marginX = width * currentSettings.marginFraction;
+      const marginY = height * currentSettings.marginFraction;
 
-    const settings = settingsRef.current;
-    const marginX = width * settings.marginFraction;
-    const marginY = height * settings.marginFraction;
+      // Draw the margin areas
+      ctx.beginPath();
+      ctx.rect(0, 0, marginX, height);
+      ctx.fill();
+      ctx.stroke();
 
-    // Create a semi-transparent version of the boid color for the margins
-    const marginColor = hexToRgba(settings.boidColor, 0.1);
+      // Right margin
+      ctx.beginPath();
+      ctx.rect(width - marginX, 0, marginX, height);
+      ctx.fill();
+      ctx.stroke();
 
-    // Draw the margin areas
-    ctx.fillStyle = marginColor;
-    ctx.strokeStyle = hexToRgba(settings.boidColor, 0.3);
+      // Top margin
+      ctx.beginPath();
+      ctx.rect(0, 0, width, marginY);
+      ctx.fill();
+      ctx.stroke();
 
-    // Left margin
-    ctx.beginPath();
-    ctx.rect(0, 0, marginX, height);
-    ctx.fill();
-    ctx.stroke();
-
-    // Right margin
-    ctx.beginPath();
-    ctx.rect(width - marginX, 0, marginX, height);
-    ctx.fill();
-    ctx.stroke();
-
-    // Top margin
-    ctx.beginPath();
-    ctx.rect(0, 0, width, marginY);
-    ctx.fill();
-    ctx.stroke();
-
-    // Bottom margin
-    ctx.beginPath();
-    ctx.rect(0, height - marginY, width, marginY);
-    ctx.fill();
-    ctx.stroke();
-  };
+      // Bottom margin
+      ctx.beginPath();
+      ctx.rect(0, height - marginY, width, marginY);
+      ctx.fill();
+      ctx.stroke();
+    },
+    [hexToRgba],
+  );
 
   // Function to draw a subtle grid on the canvas when in wraparound mode
-  const drawWraparoundGrid = (
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-  ) => {
-    if (!settingsRef.current.wraparoundMode) return;
+  const drawWraparoundGrid = useCallback(
+    (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+      if (!settingsRef.current.wraparoundMode) return;
+      const currentSettings = settingsRef.current;
+      const gridColor = hexToRgba(currentSettings.boidColor, 0.1); // Use hexToRgba from outer scope
+      ctx.strokeStyle = gridColor;
+      ctx.lineWidth = 1;
 
-    const settings = settingsRef.current;
+      // Draw vertical center line
+      ctx.beginPath();
+      ctx.setLineDash([5, 5]); // Create a dashed line
+      ctx.moveTo(width / 2, 0);
+      ctx.lineTo(width / 2, height);
+      ctx.stroke();
 
-    // Create a very subtle grid color based on the boid color
-    const gridColor = hexToRgba(settings.boidColor, 0.1);
+      // Draw horizontal center line
+      ctx.beginPath();
+      ctx.moveTo(0, height / 2);
+      ctx.lineTo(width, height / 2);
+      ctx.stroke();
 
-    ctx.strokeStyle = gridColor;
-    ctx.lineWidth = 1;
-
-    // Draw vertical center line
-    ctx.beginPath();
-    ctx.setLineDash([5, 5]); // Create a dashed line
-    ctx.moveTo(width / 2, 0);
-    ctx.lineTo(width / 2, height);
-    ctx.stroke();
-
-    // Draw horizontal center line
-    ctx.beginPath();
-    ctx.moveTo(0, height / 2);
-    ctx.lineTo(width, height / 2);
-    ctx.stroke();
-
-    // Reset line dash
-    ctx.setLineDash([]);
-  };
-
-  // Helper function to convert hex color to rgba
-  const hexToRgba = (hex: string, alpha: number): string => {
-    // Remove the hash if it exists
-    hex = hex.replace("#", "");
-
-    // Parse the hex values
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-
-    // Return as rgba
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
+      // Reset line dash
+      ctx.setLineDash([]);
+    },
+    [hexToRgba],
+  );
 
   // Function to update a single frame
-  const updateFrame = () => {
+  const updateFrame = useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -1399,7 +1392,6 @@ const BoidsSimulation = () => {
     const width = canvas.width;
     const height = canvas.height;
 
-    // Update each boid
     for (const boid of boids) {
       applyCohesion(boid, boids);
       applySeparation(boid, boids);
@@ -1413,18 +1405,24 @@ const BoidsSimulation = () => {
       boid.history = boid.history.slice(-50);
     }
 
-    // Clear and redraw
     ctx.clearRect(0, 0, width, height);
-    boids.forEach((boid) => {
-      drawBoid(ctx, boid);
+    boids.forEach((currentBoid) => {
+      drawBoid(ctx, currentBoid, hexToRgba);
     });
 
-    // Draw margins after drawing all boids
     drawMargins(ctx, width, height);
-
-    // Draw wraparound grid after drawing all boids
     drawWraparoundGrid(ctx, width, height);
-  };
+  }, [
+    hexToRgba,
+    applyCohesion,
+    applySeparation,
+    applyAlignment,
+    limitSpeed,
+    keepWithinBounds,
+    drawBoid,
+    drawMargins,
+    drawWraparoundGrid,
+  ]);
 
   // Setup the animation loop only once
   useEffect(() => {
@@ -1448,7 +1446,7 @@ const BoidsSimulation = () => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isPaused, updateFrame]); // Add updateFrame to dependencies
+  }, [isPaused, updateFrame]);
 
   // Separate effect for initialization and resize handling
   useEffect(() => {

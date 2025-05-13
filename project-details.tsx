@@ -10,6 +10,6 @@ export const projectDetails = {
   imageUrl: "/projects/boids-battleground.png",
   tags: ["Canvas", "Simulation", "Interactive", "Next.js", "TypeScript"],
   githubUrl: "https://github.com/SollalF/boids-battleground",
-  liveUrl: "https://boids.demo.com",
+  liveUrl: null,
   icon: CirclePlay,
 };
